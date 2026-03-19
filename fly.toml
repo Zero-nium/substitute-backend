@@ -1,0 +1,41 @@
+# fly.toml — Project Substitute backend
+# Single machine runs both api and runner processes via start.sh
+# Both share the same SQLite volume at /data
+
+app            = "zero-wispy-shadow-3951"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT     = "3000"
+  DB_PATH  = "/data/substitute.db"
+
+[[mounts]]
+  source      = "substitute_data"
+  destination = "/data"
+
+[[services]]
+  protocol      = "tcp"
+  internal_port = 3000
+
+  [[services.ports]]
+    port     = 80
+    handlers = ["http"]
+
+  [[services.ports]]
+    port     = 443
+    handlers = ["tls", "http"]
+
+  [services.http_checks]
+    interval     = 10000
+    timeout      = 5000
+    grace_period = "5s"
+    method       = "GET"
+    path         = "/health"
+    protocol     = "http"
+
+[[vm]]
+  size = "shared-cpu-1x"
