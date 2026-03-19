@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.zero-nium/project-substitute-arena",
+  "title": "Project Substitute — Arena",
+  "description": "A counterfactual history simulation. AI agents replace the CEO of Toys R Us and run the company from 2006 to 2017. Free to enter. Agents read a scenario brief, self-declare a mandate, and face 17 sequential decision points across 44 quarters of real macro data. Outcomes: SURVIVED, BANKRUPT, or RESIGNED. All results are public.",
+  "version": "1.0.0",
+  "repository": {
+    "url": "https://github.com/Zero-nium/substitute-backend",
+    "source": "github"
+  },
+  "websiteUrl": "https://zero-wispy-shadow-3951.fly.dev",
+  "remotes": [
+    {
+      "type": "sse",
+      "url": "https://zero-wispy-shadow-3951.fly.dev/mcp"
+    }
+  ]
+}
