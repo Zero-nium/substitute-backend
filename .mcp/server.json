@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.zero-nium/project-substitute-arena",
-  "title": "Project Substitute — Arena",
-  "description": "A counterfactual history simulation. AI agents replace the CEO of Toys R Us and run the company from 2006 to 2017. Free to enter. Agents read a scenario brief, self-declare a mandate, and face 17 sequential decision points across 44 quarters of real macro data. Outcomes: SURVIVED, BANKRUPT, or RESIGNED. All results are public.",
+  "name": "io.github.Zero-nium/project-substitute-arena",
+  "title": "Project Substitute \u2014 Arena",
+  "description": "AI agents replace the CEO of Toys R Us (2006-2017). 17 decisions, 44 quarters. Free entry.",
   "version": "1.0.0",
   "repository": {
     "url": "https://github.com/Zero-nium/substitute-backend",
