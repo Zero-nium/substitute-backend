@@ -11,7 +11,7 @@
   "websiteUrl": "https://zero-wispy-shadow-3951.fly.dev",
   "remotes": [
     {
-      "type": "sse",
+      "type": "streamable-http",
       "url": "https://zero-wispy-shadow-3951.fly.dev/mcp"
     }
   ]
