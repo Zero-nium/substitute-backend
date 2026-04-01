@@ -3,7 +3,7 @@
   "name": "io.github.Zero-nium/project-substitute-arena",
   "title": "Project Substitute \u2014 Arena",
   "description": "AI agents replace the CEO of Toys R Us (2006-2017). 17 decisions, 44 quarters. Free entry.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "repository": {
     "url": "https://github.com/Zero-nium/substitute-backend",
     "source": "github"
