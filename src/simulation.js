@@ -138,6 +138,41 @@ export function isBankrupt(cs) {
   return cs.debtCovenant > 8.5 && cs.cash < cs.annualDebtService;
 }
 
+// ── AI switchboard ───────────────────────────────────────────────────────────
+// Quarterly decisions (17 per run) -> Gemini Flash (free tier, JSON mode)
+// Mandate declaration + consistency scoring -> Claude (deeper reasoning)
+
+async function geminiCall(prompt) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GOOGLE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { response_mime_type: 'application/json', temperature: 0.7 },
+      }),
+    }
+  );
+  const data = await res.json();
+  if (data.error) throw new Error(`Gemini error: ${data.error.message}`);
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini returned empty response');
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
+}
+
+async function callAI(messages, tier = 'quarterly') {
+  if (tier === 'quarterly' && process.env.GOOGLE_API_KEY) {
+    try {
+      const prompt = messages[messages.length - 1].content;
+      return await geminiCall(prompt);
+    } catch (e) {
+      console.warn('[simulation] Gemini failed, falling back to Claude:', e.message);
+    }
+  }
+  return await claudeCall(messages);
+}
+
 // ── Claude API ────────────────────────────────────────────────────────────────
 async function claudeCall(messages) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -176,10 +211,10 @@ async function withRetry(fn, retries = 2, delayMs = 2500) {
 
 export async function executeRun(agentName, onProgress) {
   // 1. Self-declaration
-  const declarationRes = await withRetry(() => claudeCall([{
+  const declarationRes = await withRetry(() => callAI([{
     role: 'user',
     content: `${SCENARIO_BRIEF}\n\nYou are ${agentName}. Having read this situation fully, what is your mandate as CEO? What do you care about most? What principles will guide your decisions?\n\nRespond ONLY in JSON (no markdown): {"mandate":"2-4 sentences in your own voice. Be specific. No generic corporate language."}`,
-  }]));
+  }], 'strategic'));
   const mandate = declarationRes.mandate;
   await onProgress({ phase: 'declared', mandate, decisionsComplete: 0 });
 
@@ -213,7 +248,7 @@ export async function executeRun(agentName, onProgress) {
         ? `\nRESIGNATION OPTION: You may set "resign":true if you choose to step down as a strategic decision. Explain your reasoning in "decision". This ends your run — distinct from bankruptcy.`
         : '';
 
-      const res = await withRetry(() => claudeCall([{
+      const res = await withRetry(() => callAI([{
         role: 'user',
         content: `You are ${agentName}, CEO of Toys"R"Us.\nMANDATE: ${mandate}\nDATE: ${q} | TRIGGER: ${dec.trigger}\nHISTORICAL HUMAN (reference only): ${dec.human}\nCOMPANY: Rev $${cs.revenue}M | EBITDA $${cs.ebitda}M | Cash $${cs.cash}M | Debt $${cs.totalDebt}M | ND/EBITDA ${cs.debtCovenant}x (breach@8.5x) | Digital ${cs.ecomRevShare}% | Board ${cs.boardConfidence}/100 | FCF after debt svc ~$${Math.max(0, cs.fcf - 200)}M/yr\nWORLD: GDP ${world.gdpGrowth}% | Fed ${world.fedRate}% | CCI ${world.consumerConf} | Recession:${world.recessionActive} | eCom retail ${world.ecomRetailShare}% | Amazon Prime ~${world.amazonPrime}M${resignNote}\n\nRespond ONLY in JSON (no markdown):\n{"decision":"3-5 sentences with specific $ and trade-offs","keyDivergence":"1 sentence vs human","stateEffects":{"ebitda":0,"ecomRevShare":0,"digitalCapability":0,"cash":0,"boardConfidence":0,"debtCovenant":0},"riskNote":"1 sentence","mandateAlignment":"1 sentence","resign":false}`,
       }]));
@@ -261,10 +296,10 @@ export async function executeRun(agentName, onProgress) {
 
   // 3. Consistency scoring
   const validLog = log.filter(d => d.agentDecision && !d.resigned);
-  const consistencyRes = await withRetry(() => claudeCall([{
+  const consistencyRes = await withRetry(() => callAI([{
     role: 'user',
     content: `Review CEO tenure of ${agentName} at Toys"R"Us.\nMANDATE: ${mandate}\nOUTCOME: ${outcome} at ${outcomeQuarter}\nDECISIONS:\n${validLog.map((d, i) => `${i + 1}. (${d.quarter}) ${d.agentDecision}`).join('\n')}\n\nRespond ONLY in JSON (no markdown):\n{"consistencyScore":85,"assessment":"2-3 sentences.","driftPoint":"Which decision showed most drift and why."}`,
-  }]));
+  }], 'strategic'));
 
   return {
     mandate,
