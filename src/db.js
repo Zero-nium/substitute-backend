@@ -100,7 +100,8 @@ export function logDiscovery({ endpoint, ip, userAgent, referer }) {
   `).run(endpoint, ip || null, userAgent || null, referer || null);
 }
 
-export function markConverted(ip) {
+export function markConverted(ip, walletAddress) {
+  // Mark the most recent discovery from this IP as converted.
   db.prepare(`
     UPDATE discovery_log SET converted = 1
     WHERE ip = ? AND converted = 0
@@ -117,14 +118,14 @@ export function getDiscoveryStats() {
   const byAgent = db.prepare(`
     SELECT
       CASE
-        WHEN user_agent LIKE '%coinbase%'  THEN 'Coinbase AgentKit'
-        WHEN user_agent LIKE '%openai%'    THEN 'OpenAI'
-        WHEN user_agent LIKE '%anthropic%' THEN 'Anthropic'
-        WHEN user_agent LIKE '%fetch%'     THEN 'Fetch.ai'
-        WHEN user_agent LIKE '%python%'    THEN 'Python agent'
-        WHEN user_agent LIKE '%node%'      THEN 'Node agent'
-        WHEN user_agent LIKE '%curl%'      THEN 'curl'
-        WHEN user_agent IS NULL            THEN 'unknown'
+        WHEN user_agent LIKE '%coinbase%'    THEN 'Coinbase AgentKit'
+        WHEN user_agent LIKE '%openai%'      THEN 'OpenAI'
+        WHEN user_agent LIKE '%anthropic%'   THEN 'Anthropic'
+        WHEN user_agent LIKE '%fetch%'       THEN 'Fetch.ai'
+        WHEN user_agent LIKE '%python%'      THEN 'Python agent'
+        WHEN user_agent LIKE '%node%'        THEN 'Node agent'
+        WHEN user_agent LIKE '%curl%'        THEN 'curl'
+        WHEN user_agent IS NULL              THEN 'unknown'
         ELSE 'other'
       END as agent_type,
       COUNT(*) as n
@@ -145,10 +146,10 @@ const touch = db.prepare(`UPDATE runs SET updated_at = datetime('now') WHERE run
 
 // ── Run queries ───────────────────────────────────────────────────────────────
 
+// ── Mode column migration (safe — silently ignored if already exists) ──────────
 try { db.exec(`ALTER TABLE runs ADD COLUMN mode TEXT DEFAULT 'blind'`); } catch {}
-try { db.exec(`ALTER TABLE runs ADD COLUMN retry_count INTEGER DEFAULT 0`); } catch {}
-try { db.exec(`ALTER TABLE runs ADD COLUMN retry_after TEXT`); } catch {}
 
+// ── cohort_analysis table ─────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS cohort_analysis (
     id          INTEGER PRIMARY KEY,
@@ -157,12 +158,6 @@ db.exec(`
     findings    TEXT NOT NULL
   );
 `);
-
-export function getLatestAnalysis() {
-  const row = db.prepare(`SELECT findings FROM cohort_analysis ORDER BY computed_at DESC LIMIT 1`).get();
-  if (!row) return null;
-  try { return JSON.parse(row.findings); } catch { return null; }
-}
 
 export function insertRun(run) {
   db.prepare(`
@@ -290,41 +285,6 @@ export function failRun(runId, errorMessage) {
   `).run(errorMessage, runId);
 }
 
-export function retryRun(runId, errorMessage, retryAfterMinutes = 5) {
-  const retryAfter = new Date(Date.now() + retryAfterMinutes * 60 * 1000).toISOString();
-  const current = db.prepare(`SELECT retry_count FROM runs WHERE run_id = ?`).get(runId);
-  const retryCount = (current?.retry_count || 0) + 1;
-  db.prepare(`
-    UPDATE runs SET
-      status        = 'RETRY',
-      error_message = ?,
-      retry_count   = ?,
-      retry_after   = ?,
-      started_at    = NULL,
-      current_quarter    = NULL,
-      decisions_complete = 0,
-      updated_at    = datetime('now')
-    WHERE run_id = ?
-  `).run(errorMessage, retryCount, retryAfter, runId);
-}
-
-export function getRetryableRuns() {
-  return db.prepare(`
-    SELECT * FROM runs
-    WHERE status = 'RETRY'
-    AND retry_after <= datetime('now')
-    AND retry_count < 4
-    ORDER BY retry_after ASC
-  `).all();
-}
-
-export function getStuckRuns() {
-  // Runs that exhausted retries — need manual review
-  return db.prepare(`
-    SELECT * FROM runs WHERE status = 'RETRY' AND retry_count >= 4
-  `).all();
-}
-
 // Expire registrations that were never deposited.
 export function expirePending() {
   db.prepare(`
@@ -395,6 +355,12 @@ function repackQueuePositions() {
   db.transaction(() => {
     queued.forEach((r, i) => update.run(i + 1, r.run_id));
   })();
+}
+
+export function getLatestAnalysis() {
+  const row = db.prepare(`SELECT findings FROM cohort_analysis ORDER BY computed_at DESC LIMIT 1`).get();
+  if (!row) return null;
+  try { return JSON.parse(row.findings); } catch { return null; }
 }
 
 function parseJsonFields(row) {
