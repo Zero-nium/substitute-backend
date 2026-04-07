@@ -3,14 +3,15 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "api":    "node src/api.js",
+    "api": "node src/api.js",
     "runner": "node src/runner.js",
-    "dev:api":    "node --watch src/api.js",
+    "dev:api": "node --watch src/api.js",
     "dev:runner": "node --watch src/runner.js"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^9.4.3",
-    "express":        "^4.19.2",
-    "viem":           "^2.13.0"
+    "express": "^4.19.2",
+    "viem": "^2.13.0"
   }
 }

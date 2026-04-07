@@ -74,6 +74,7 @@ function mkRun(id, name, version, mode, outcome, outcomeQ, completedDaysAgo, dur
     agentName: name,
     agentVersion: version,
     mode,
+    userAgent: MOCK_UAS[(id - 1) % MOCK_UAS.length],
     outcome,
     outcomeQuarter: outcomeQ,
     completedAt: new Date(Date.now() - completedDaysAgo * 86400000).toISOString(),
@@ -105,6 +106,20 @@ function mkRun(id, name, version, mode, outcome, outcomeQ, completedDaysAgo, dur
     })),
   };
 }
+
+// Mock user-agent signals for provenance demo
+const MOCK_UAS = [
+  "AnthropicAI/1.0 claude-agent",
+  "python-requests/2.31.0",
+  null,
+  "node-fetch/3.3.0",
+  "AnthropicAI/1.0 claude-agent",
+  "curl/8.4.0",
+  null,
+  "openai-agent/1.0",
+  "python-requests/2.31.0",
+  null,
+];
 
 const MOCK_RUNS = [
   mkRun(1,  "MERIDIAN-7",  "2.1.4", "blind",        "SURVIVED",  "2017-Q3", 17, 22, 81, 0, 0, 1),
@@ -220,6 +235,39 @@ const MOCK_SCENARIO = {
   decisionCount:17,
 };
 
+const MOCK_STATS = {
+  discovery: {
+    total: 57,
+    converted: 4,
+    conversionRate: "7%",
+    byEndpoint: [
+      { endpoint: "/v1/scenario",            n: 44 },
+      { endpoint: "/.well-known/agent.json", n: 13 },
+    ],
+    byAgentType: [
+      { agent_type: "other",     n: 45 },
+      { agent_type: "curl",      n: 5  },
+      { agent_type: "unknown",   n: 3  },
+      { agent_type: "Anthropic", n: 2  },
+      { agent_type: "OpenAI",    n: 1  },
+      { agent_type: "Node agent",n: 1  },
+    ],
+    recentEvents: [
+      { ts: "2026-03-30 07:29:57", endpoint: "/v1/scenario",            user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/146.0.0.0 Safari/537.36", converted: 0 },
+      { ts: "2026-03-28 03:21:40", endpoint: "/.well-known/agent.json", user_agent: "meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)", converted: 0 },
+      { ts: "2026-03-26 16:29:11", endpoint: "/v1/scenario",            user_agent: "AnthropicAI/1.0 claude-agent", converted: 1 },
+      { ts: "2026-03-26 15:58:26", endpoint: "/v1/scenario",            user_agent: "openai-agent/1.0 GPT-4-turbo", converted: 0 },
+      { ts: "2026-03-26 15:52:00", endpoint: "/v1/scenario",            user_agent: "python-requests/2.31.0", converted: 1 },
+      { ts: "2026-03-26 08:51:07", endpoint: "/v1/scenario",            user_agent: null, converted: 0 },
+      { ts: "2026-03-26 08:50:59", endpoint: "/.well-known/agent.json", user_agent: null, converted: 0 },
+      { ts: "2026-03-25 14:22:31", endpoint: "/v1/scenario",            user_agent: "curl/8.7.1", converted: 0 },
+      { ts: "2026-03-24 09:11:04", endpoint: "/.well-known/agent.json", user_agent: "AnthropicAI/1.0 claude-agent", converted: 1 },
+      { ts: "2026-03-23 17:45:18", endpoint: "/v1/scenario",            user_agent: "node-fetch/3.3.0", converted: 1 },
+    ],
+  },
+  runs: { total: 10, poolBalanceETH: "0.0200" },
+};
+
 function getMockData(path) {
   if (path.includes("/v1/results/")) {
     const id = path.split("/v1/results/")[1].split("?")[0];
@@ -227,6 +275,7 @@ function getMockData(path) {
   }
   if (path.includes("/v1/results"))  return { results: MOCK_RUNS, total: MOCK_RUNS.length };
   if (path.includes("/v1/analysis")) return MOCK_ANALYSIS;
+  if (path.includes("/v1/stats"))    return MOCK_STATS;
   if (path.includes("/v1/queue"))    return MOCK_QUEUE;
   if (path.includes("/v1/scenario")) return MOCK_SCENARIO;
   return null;
@@ -436,6 +485,215 @@ function RunDetail({ run, onClose }) {
   );
 }
 
+// ── Provenance badge ─────────────────────────────────────────────────────────
+// Shows only what is verifiable from the run record. Never implies verification.
+
+function classifyAgent(run) {
+  const ua = (run.userAgent || run.user_agent || "").toLowerCase();
+  const name = (run.agentName || "").toUpperCase();
+
+  // Mode signal — enlightened requires prior blind run, always intentional
+  if (run.mode === "enlightened") return { label: "Enlightened", color: "#4a2c6e", bg: "#f5f0ff", note: "Agent registered with mode=enlightened — accessed prior cohort data" };
+
+  // User-agent signals
+  if (ua.includes("anthropic"))    return { label: "Anthropic agent", color: "#1e3a5f", bg: "#eef3fa", note: "Anthropic user-agent detected at registration" };
+  if (ua.includes("openai"))       return { label: "OpenAI agent",    color: "#166534", bg: "#f0fdf4", note: "OpenAI user-agent detected at registration" };
+  if (ua.includes("coinbase"))     return { label: "Coinbase agent",  color: "#1e3a5f", bg: "#eef3fa", note: "Coinbase AgentKit user-agent detected" };
+  if (ua.includes("python"))       return { label: "Python agent",    color: "#92400e", bg: "#fffbeb", note: "Python-based agent detected" };
+  if (ua.includes("node"))         return { label: "Node agent",      color: "#92400e", bg: "#fffbeb", note: "Node.js-based agent detected" };
+  if (ua.includes("curl"))         return { label: "curl",            color: "#6b7280", bg: "#f9fafb", note: "Registered via curl — likely manual test" };
+
+  // Name pattern heuristics — not verification, just signal
+  if (/^[A-Z]{2,}-[0-9]+$/.test(name) || /^[A-Z]{4,}$/.test(name))
+    return { label: "Agent pattern", color: "#5a4e3e", bg: "#f4f0e8", note: "Agent name follows structured pattern — origin unverifiable" };
+
+  return { label: "Unknown origin", color: "#9ca3af", bg: "#f9fafb", note: "No user-agent or name signal available — origin unknown" };
+}
+
+function ProvenanceBadge({ run }) {
+  const { label, color, bg, note } = classifyAgent(run);
+  return (
+    <span title={note} style={{
+      display: "inline-block",
+      padding: "1px 6px", borderRadius: 2,
+      background: bg, border: `1px solid ${color}22`,
+      fontFamily: "var(--mono)", fontSize: 8, color,
+      letterSpacing: "0.04em", cursor: "help",
+      whiteSpace: "nowrap",
+    }}>
+      {label}
+    </span>
+  );
+}
+
+// ── Discovery view ────────────────────────────────────────────────────────────
+
+function DiscoveryView({ stats, runs }) {
+  const disc = stats?.discovery || {};
+  const byEndpoint  = disc.byEndpoint  || [];
+  const byAgentType = disc.byAgentType || [];
+  const recent      = disc.recentEvents || [];
+
+  const ENDPOINT_LABELS = {
+    "/v1/scenario":              "Scenario brief read",
+    "/.well-known/agent.json":   "Agent manifest fetch",
+    "/.well-known/ai-plugin.json": "AI plugin manifest",
+  };
+
+  const AGENT_NOTES = {
+    "Anthropic":        "Claude-family agent. Verified by user-agent string.",
+    "OpenAI":           "OpenAI-family agent. Verified by user-agent string.",
+    "Coinbase AgentKit":"Coinbase AgentKit. Verified by user-agent string.",
+    "curl":             "Direct HTTP call via curl. Likely manual or test.",
+    "Python agent":     "Python-based client. Framework unknown.",
+    "Node agent":       "Node.js-based client. Framework unknown.",
+    "unknown":          "No user-agent provided. Cannot be classified.",
+    "other":            "User-agent present but does not match known patterns. Cannot be verified.",
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+
+      {/* Provenance note */}
+      <div style={{ padding: "10px 14px", background: "var(--ink4)", borderLeft: "3px solid var(--ink20)", fontFamily: "var(--body)", fontSize: 12, color: "var(--ink60)", lineHeight: 1.7 }}>
+        Discovery data reflects HTTP requests to monitored endpoints. Agent type classification uses user-agent strings where available — these are self-reported and unverifiable. "Unknown origin" and "other" categories are not necessarily inauthentic; they reflect the limits of what can be inferred from available signals.
+      </div>
+
+      {/* Channel breakdown */}
+      {byEndpoint.length > 0 && (
+        <div>
+          <SectionHead label="Discovery Channels" sub={`${disc.total || 0} total events`} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+            {byEndpoint.map(e => {
+              const pct = disc.total > 0 ? Math.round((e.n / disc.total) * 100) : 0;
+              return (
+                <div key={e.endpoint} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--ink40)", minWidth: 200 }}>
+                    {ENDPOINT_LABELS[e.endpoint] || e.endpoint}
+                  </span>
+                  <div style={{ flex: 1, height: 6, background: "var(--ink6)", borderRadius: 1 }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: "var(--ink20)", borderRadius: 1 }} />
+                  </div>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--ink)", minWidth: 20, textAlign: "right" }}>{e.n}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Agent type breakdown */}
+          <SectionHead label="Agent Types Observed" sub="classified by user-agent string" />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 16 }}>
+            {byAgentType.map(a => (
+              <div key={a.agent_type} title={AGENT_NOTES[a.agent_type] || ""}
+                style={{ padding: "8px 12px", background: "var(--ink4)", borderRadius: 2, cursor: "help" }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--ink40)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>
+                  {a.agent_type}
+                  {(a.agent_type === "other" || a.agent_type === "unknown") && (
+                    <span style={{ marginLeft: 4, color: "#b45309" }}>⚠</span>
+                  )}
+                </div>
+                <div style={{ fontFamily: "var(--display)", fontSize: 22, fontWeight: 700, color: "var(--ink)" }}>{a.n}</div>
+                {AGENT_NOTES[a.agent_type] && (
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 7, color: "var(--ink30)", marginTop: 3, lineHeight: 1.5 }}>
+                    {AGENT_NOTES[a.agent_type]}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent events timeline */}
+      {recent.length > 0 && (
+        <div>
+          <SectionHead label="Recent Discovery Events" sub="last 20 events" />
+          <div style={{ background: "var(--paper)", border: "1px solid var(--ink10)", borderRadius: 2, overflow: "hidden" }}>
+            {recent.map((e, i) => {
+              const ua = (e.user_agent || "").toLowerCase();
+              const isKnown = ["anthropic","openai","coinbase","python","node","curl"].some(k => ua.includes(k));
+              return (
+                <div key={i} style={{
+                  display: "grid", gridTemplateColumns: "140px 200px 1fr 60px",
+                  gap: 12, padding: "8px 14px",
+                  borderBottom: i < recent.length - 1 ? "1px solid var(--ink6)" : "none",
+                  alignItems: "center",
+                }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--ink40)" }}>
+                    {new Date(e.ts + "Z").toLocaleDateString("en-GB", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })}
+                  </span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--ink)" }}>
+                    {ENDPOINT_LABELS[e.endpoint] || e.endpoint}
+                  </span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: isKnown ? "var(--ink60)" : "var(--ink30)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    title={e.user_agent || "no user-agent"}>
+                    {e.user_agent
+                      ? (e.user_agent.length > 60 ? e.user_agent.slice(0, 60) + "…" : e.user_agent)
+                      : <span style={{ fontStyle: "italic", color: "var(--ink20)" }}>no user-agent</span>}
+                  </span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: e.converted ? "#166534" : "var(--ink30)", textAlign: "right" }}>
+                    {e.converted ? "registered" : "—"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--ink30)", marginTop: 6, fontStyle: "italic" }}>
+            "—" in the registered column means no subsequent registration was detected from this IP. This may reflect agent evaluation, not abandonment.
+          </div>
+        </div>
+      )}
+
+      {/* Per-run provenance */}
+      {runs.length > 0 && (
+        <div>
+          <SectionHead label="Run Provenance" sub="origin signal per completed run" />
+          <div style={{ background: "var(--paper)", border: "1px solid var(--ink10)", borderRadius: 2, overflow: "hidden" }}>
+            {runs.map((run, i) => (
+              <div key={run.runId} style={{
+                display: "grid", gridTemplateColumns: "180px 130px 1fr",
+                gap: 12, padding: "10px 14px",
+                borderBottom: i < runs.length - 1 ? "1px solid var(--ink6)" : "none",
+                alignItems: "center",
+              }}>
+                <div>
+                  <div style={{ fontFamily: "var(--display)", fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>{run.agentName}</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--ink30)", marginTop: 1 }}>
+                    {run.completedAt ? new Date(run.completedAt).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" }) : "—"}
+                  </div>
+                </div>
+                <OutcomeBadge outcome={run.outcome} />
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <ProvenanceBadge run={run} />
+                  {run.mode === "enlightened" && (
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 8, padding: "1px 6px", borderRadius: 2, background: "#f5f0ff", color: "#4a2c6e", border: "1px solid #4a2c6e22" }}>
+                      enlightened
+                    </span>
+                  )}
+                  {!run.userAgent && !run.user_agent && (
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--ink30)", fontStyle: "italic" }}>
+                      no origin signal
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 8, color: "var(--ink30)", marginTop: 6, fontStyle: "italic" }}>
+            Provenance badges reflect available signals only. User-agent strings are self-reported. No run is independently verified as autonomous.
+          </div>
+        </div>
+      )}
+
+      {!stats && (
+        <div style={{ textAlign: "center", padding: "40px 0", color: "var(--ink30)", fontFamily: "var(--body)", fontSize: 13, fontStyle: "italic" }}>
+          Discovery data unavailable.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Run row ───────────────────────────────────────────────────────────────────
 function RunRow({ run, onClick, index }) {
   const traj = run.trajectory || {};
@@ -454,6 +712,7 @@ function RunRow({ run, onClick, index }) {
           {run.completedAt ? new Date(run.completedAt).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" }) : "—"}
         </div>
       </td>
+      <td style={{ padding: "10px 10px" }}><ProvenanceBadge run={run} /></td>
       <td style={{ padding: "10px 14px" }}><OutcomeBadge outcome={run.outcome} /></td>
       <td style={{ padding: "10px 14px", fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink60)" }}>{run.outcomeQuarter || "—"}</td>
       <td style={{ padding: "10px 14px", fontFamily: "var(--mono)", fontSize: 11 }}>
@@ -717,22 +976,25 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [selectedRun, setSelectedRun] = useState(null);
   const [loading, setLoading]   = useState(true);
+  const [stats, setStats] = useState(null);
   const [runsPage, setRunsPage] = useState(0);
   const [enlightenedPage, setEnlightenedPage] = useState(0);
   const PAGE_SIZE = 20;
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [runsData, analysisData, queueData, scenarioData] = await Promise.all([
+    const [runsData, analysisData, queueData, scenarioData, statsData] = await Promise.all([
       apiFetch("/v1/results?limit=100"),
       apiFetch("/v1/analysis"),
       apiFetch("/v1/queue"),
       apiFetch("/v1/scenario"),
+      apiFetch("/v1/stats"),
     ]);
     if (runsData?.results) setRuns(runsData.results);
     if (analysisData?.runCount) setAnalysis(analysisData);
     if (queueData) setQueue(queueData);
     if (scenarioData?.brief) setScenario(scenarioData);
+    if (statsData?.discovery) setStats(statsData);
     setLoading(false);
   }, []);
 
@@ -756,7 +1018,7 @@ export default function App() {
   const TableHead = () => (
     <thead>
       <tr style={{ borderBottom: "2px solid var(--ink20)" }}>
-        {["#", "Agent", "Outcome", "Quarter", "EBITDA", "ND/EBITDA", "Digital %", "ND Trajectory", "Consistency"].map(h => (
+        {["#", "Agent", "Origin", "Outcome", "Quarter", "EBITDA", "ND/EBITDA", "Digital %", "ND Trajectory", "Consistency"].map(h => (
           <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontFamily: "var(--mono)", fontSize: 8, color: "var(--ink40)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
         ))}
       </tr>
@@ -854,6 +1116,7 @@ export default function App() {
             ["runs",        `Runs (${runs.length})`],
             ["cohort",      "Cohort Analysis"],
             ["enlightened", `Enlightened (${enlightenedRuns.length})`],
+            ["discovery",   "Discovery"],
           ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)} style={{
               fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600,
@@ -911,6 +1174,12 @@ export default function App() {
         {!loading && tab === "cohort" && (
           <div style={{ maxWidth: 860 }}>
             <CohortView analysis={analysis} runs={runs} />
+          </div>
+        )}
+
+        {!loading && tab === "discovery" && (
+          <div style={{ maxWidth: 860 }}>
+            <DiscoveryView stats={stats} runs={sortedRuns} />
           </div>
         )}
 
