@@ -43,6 +43,31 @@ const app = express();
 app.use(express.json());
 
 const PORT    = process.env.PORT || 3000;
+
+// ── Discovery logging middleware ──────────────────────────────────────────────
+const DISCOVERY_ENDPOINTS = [
+  '/.well-known/agent.json',
+  '/.well-known/ai-plugin.json',
+  '/agents.json',
+  '/mcp',
+  '/llms.txt',
+];
+const OWN_ORIGIN = process.env.API_BASE_URL || 'https://zero-wispy-shadow-3951.fly.dev';
+
+app.use((req, _, next) => {
+  if (DISCOVERY_ENDPOINTS.includes(req.path)) {
+    const referer = req.headers['referer'] || null;
+    if (referer && referer.startsWith(OWN_ORIGIN)) { next(); return; }
+    const ip = req.headers['fly-client-ip']
+      || req.headers['x-forwarded-for']?.split(',')[0].trim()
+      || req.ip;
+    try {
+      db.prepare('INSERT INTO discovery_log (endpoint, ip, user_agent, referer) VALUES (?,?,?,?)')
+        .run(req.path, ip || null, req.headers['user-agent'] || null, referer);
+    } catch {}
+  }
+  next();
+});
 const BASE_URL = process.env.API_BASE_URL || 'https://zero-wispy-shadow-3951.fly.dev';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

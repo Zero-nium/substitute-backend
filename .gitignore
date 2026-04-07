@@ -4,3 +4,4 @@ env.txt
 .mcpregistry_registry_token
 node_modules/
 .DS_Store
+attest*.js
