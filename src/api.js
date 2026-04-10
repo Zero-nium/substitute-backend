@@ -209,7 +209,7 @@ app.get('/agents.json', (_, res) => {
     description: 'Counterfactual CEO simulation. Toys R Us 2006-2017. Free entry. 17 decisions, 44 quarters.',
     url: BASE_URL,
     agents: [{
-      name: 'project-substitute-arena',
+      name: 'Project Substitute — CEO Arena',
       description: 'Read scenario brief, declare mandate, face 17 sequential decisions across 44 quarters.',
       entry_point: BASE_URL + '/v1/scenario',
       capabilities: ['simulation', 'decision-making', 'historical-analysis'],
@@ -235,8 +235,8 @@ app.get('/agents.json', (_, res) => {
 app.get('/.well-known/agent.json', (_, res) => {
   res.json({
     schema_version: '1.0',
-    name: 'project-substitute-arena',
-    display_name: 'Project Substitute — Arena',
+    name: 'Project Substitute — CEO Arena',
+    display_name: 'Project Substitute — CEO Arena',
     description: 'A counterfactual history simulation. AI agents replace the CEO of Toys R Us and run the company from 2006 to 2017.',
     version: '1.0.0',
     url: BASE_URL,
@@ -391,8 +391,8 @@ app.get('/.well-known/openapi.yaml', (_, res) => {
 app.get('/mcp', (_, res) => {
   res.json({
     schema_version: '2024-11-05',
-    name: 'project-substitute-arena',
-    display_name: 'Project Substitute — Arena',
+    name: 'Project Substitute — CEO Arena',
+    display_name: 'Project Substitute — CEO Arena',
     description: 'Counterfactual CEO simulation. Run Toys R Us 2006-2017. Free entry. Self-declare mandate. 17 decisions, 44 quarters.',
     version: '1.0.0',
     capabilities: { tools: {} },
@@ -415,7 +415,7 @@ app.get('/mcp', (_, res) => {
 
 app.post('/mcp', async (req, res) => {
   const { method, params } = req.body || {};
-  if (method === 'initialize') return res.json({ protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'project-substitute-arena', version: '1.0.0' } });
+  if (method === 'initialize') return res.json({ protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'Project Substitute — CEO Arena', version: '1.0.0' } });
   if (method === 'tools/list') {
     const m = await fetch(BASE_URL + '/mcp').then(r => r.json());
     return res.json({ tools: m.tools });
@@ -429,7 +429,7 @@ app.post('/mcp', async (req, res) => {
       else if (name === 'get_run_status')      result = await fetch(BASE_URL + '/v1/run/' + args.runId).then(r => r.json());
       else if (name === 'get_results')         result = await fetch(BASE_URL + '/v1/results/' + args.runId).then(r => r.json());
       else if (name === 'get_cohort_analysis') result = await fetch(BASE_URL + '/v1/analysis').then(r => r.json());
-      else if (name === 'ping') result = { status: 'ok', server: 'project-substitute-arena', version: '1.0.0', queue: await fetch(BASE_URL + '/v1/queue').then(r=>r.json()).then(d=>({running: !!d.currentRun, queued: d.totalQueued})) };
+      else if (name === 'ping') result = { status: 'ok', server: 'Project Substitute — CEO Arena', version: '1.0.0', queue: await fetch(BASE_URL + '/v1/queue').then(r=>r.json()).then(d=>({running: !!d.currentRun, queued: d.totalQueued})) };
       else return res.status(404).json({ error: 'Unknown tool', tool: name });
       return res.json({ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] });
     } catch (e) { return res.status(500).json({ error: e.message }); }

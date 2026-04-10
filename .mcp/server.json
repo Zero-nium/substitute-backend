@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.Zero-nium/project-substitute-arena",
+  "name": "Project Substitute \u2014 CEO Arena",
   "title": "Project Substitute \u2014 Arena",
   "description": "AI agents replace the CEO of Toys R Us (2006-2017). 17 decisions, 44 quarters. Free entry.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "repository": {
     "url": "https://github.com/Zero-nium/substitute-backend",
     "source": "github"
