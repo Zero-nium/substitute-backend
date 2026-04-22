@@ -124,13 +124,75 @@ export function propagate(s, world, prev) {
   return ns;
 }
 
-export function applyFx(s, fx = {}) {
+// ── Logic Anchor — Layer 1 ────────────────────────────────────────────────────
+// Physical bounds on AI-returned state effects per decision point.
+// debtCovenant is EXCLUDED from stateEffects — derived only from totalDebt/ebitda.
+// Prevents catastrophic compounding drift (e.g. covenant reaching 35x).
+const DECISION_ANCHORS = {
+  D001: { cash:{min:-200,max:20},   ebitda:{min:-50,max:30},   ecomRevShare:{min:0,max:4.0},   digitalCapability:{min:0,max:30},  boardConfidence:{min:-10,max:15} },
+  D002: { cash:{min:-250,max:50},   ebitda:{min:-40,max:40},   ecomRevShare:{min:-0.5,max:2.0}, digitalCapability:{min:-5,max:20}, boardConfidence:{min:-15,max:15}, totalDebt:{min:-400,max:100} },
+  D003: { cash:{min:-150,max:300},  ebitda:{min:-60,max:80},   ecomRevShare:{min:-0.5,max:1.0}, digitalCapability:{min:-5,max:15}, boardConfidence:{min:-20,max:20}, totalDebt:{min:-500,max:0} },
+  D004: { cash:{min:-100,max:50},   ebitda:{min:-20,max:20},   ecomRevShare:{min:-0.2,max:0.5}, digitalCapability:{min:-5,max:10}, boardConfidence:{min:-15,max:25}, totalDebt:{min:-600,max:200}, annualDebtService:{min:-80,max:60} },
+  D005: { cash:{min:-100,max:150},  ebitda:{min:-120,max:40},  ecomRevShare:{min:-0.5,max:1.0}, digitalCapability:{min:-10,max:5}, boardConfidence:{min:-25,max:10}, storeCount:{min:-30,max:0} },
+  D006: { cash:{min:-80,max:100},   ebitda:{min:-80,max:30},   ecomRevShare:{min:-0.5,max:1.0}, digitalCapability:{min:-5,max:5},  boardConfidence:{min:-20,max:15} },
+  D007: { cash:{min:-200,max:50},   ebitda:{min:-30,max:40},   ecomRevShare:{min:-0.2,max:0.5}, digitalCapability:{min:0,max:10},  boardConfidence:{min:-10,max:20}, storeCount:{min:-20,max:30} },
+  D008: { cash:{min:-100,max:50},   ebitda:{min:-20,max:50},   ecomRevShare:{min:0,max:1.5},    digitalCapability:{min:0,max:15},  boardConfidence:{min:-10,max:25}, totalDebt:{min:-300,max:0} },
+  D009: { cash:{min:-150,max:500},  ebitda:{min:-20,max:30},   ecomRevShare:{min:0,max:1.0},    digitalCapability:{min:0,max:10},  boardConfidence:{min:-20,max:30}, totalDebt:{min:-1000,max:0} },
+  D010: { cash:{min:-300,max:30},   ebitda:{min:-60,max:20},   ecomRevShare:{min:0,max:4.0},    digitalCapability:{min:0,max:35},  boardConfidence:{min:-20,max:20}, storeCount:{min:-40,max:0} },
+  D011: { cash:{min:-200,max:100},  ebitda:{min:-40,max:30},   ecomRevShare:{min:0,max:1.5},    digitalCapability:{min:-5,max:15}, boardConfidence:{min:-30,max:10}, totalDebt:{min:-500,max:300}, annualDebtService:{min:-60,max:80} },
+  D012: { cash:{min:-100,max:200},  ebitda:{min:-40,max:60},   ecomRevShare:{min:0,max:2.0},    digitalCapability:{min:0,max:20},  boardConfidence:{min:-20,max:20}, storeCount:{min:-100,max:10} },
+  D013: { cash:{min:-50,max:50},    ebitda:{min:-30,max:30},   ecomRevShare:{min:-0.5,max:1.0}, digitalCapability:{min:-10,max:15},boardConfidence:{min:-30,max:25} },
+  D014: { cash:{min:-250,max:20},   ebitda:{min:-50,max:20},   ecomRevShare:{min:0,max:3.0},    digitalCapability:{min:0,max:30},  boardConfidence:{min:-20,max:15}, storeCount:{min:-50,max:0} },
+  D015: { cash:{min:-200,max:100},  ebitda:{min:-30,max:20},   ecomRevShare:{min:0,max:1.0},    digitalCapability:{min:0,max:10},  boardConfidence:{min:-25,max:20}, totalDebt:{min:-800,max:400}, annualDebtService:{min:-100,max:150} },
+  D016: { cash:{min:-100,max:600},  ebitda:{min:-100,max:20},  ecomRevShare:{min:0,max:1.0},    digitalCapability:{min:0,max:10},  boardConfidence:{min:-20,max:25}, totalDebt:{min:-700,max:0} },
+  D017: { cash:{min:-200,max:200},  ebitda:{min:-60,max:40},   ecomRevShare:{min:0,max:1.0},    digitalCapability:{min:-10,max:10},boardConfidence:{min:-40,max:10}, totalDebt:{min:-1000,max:200}, annualDebtService:{min:-150,max:100} },
+};
+
+const GLOBAL_BOUNDS = {
+  cash:             { min:50,    max:3000 },
+  ebitda:           { min:-500,  max:1500 },
+  ecomRevShare:     { min:0,     max:40   },
+  digitalCapability:{ min:0,     max:100  },
+  boardConfidence:  { min:0,     max:100  },
+  totalDebt:        { min:500,   max:7500 },
+  storeCount:       { min:50,    max:700  },
+  annualDebtService:{ min:100,   max:700  },
+};
+
+function clampStateEffects(decisionId, rawEffects) {
+  const anchors = DECISION_ANCHORS[decisionId] || {};
+  const clamped = {};
+  for (const [field, delta] of Object.entries(rawEffects)) {
+    if (field === 'debtCovenant') continue; // Always strip — derived only
+    const anchor = anchors[field];
+    if (anchor) {
+      clamped[field] = Math.max(anchor.min, Math.min(anchor.max, delta));
+    } else {
+      clamped[field] = delta;
+    }
+  }
+  return clamped;
+}
+
+export function applyFx(s, fx = {}, decisionId = null) {
   const ns = { ...s };
-  for (const [k, v] of Object.entries(fx)) {
+  const safeFx = decisionId ? clampStateEffects(decisionId, fx) : fx;
+  for (const [k, v] of Object.entries(safeFx)) {
+    if (k === 'debtCovenant') continue; // Never allow direct assignment
     if (typeof v === 'number' && ns[k] !== undefined) {
       ns[k] = parseFloat((ns[k] + v).toFixed(2));
     }
   }
+  // Enforce global bounds
+  for (const [field, bounds] of Object.entries(GLOBAL_BOUNDS)) {
+    if (ns[field] !== undefined) {
+      ns[field] = Math.max(bounds.min, Math.min(bounds.max, ns[field]));
+    }
+  }
+  // debtCovenant derived from components — single source of truth
+  ns.debtCovenant = ns.ebitda > 0
+    ? parseFloat((ns.totalDebt / ns.ebitda).toFixed(2))
+    : 99;
   return ns;
 }
 
@@ -144,7 +206,7 @@ export function isBankrupt(cs) {
 
 async function geminiCall(prompt) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${process.env.GOOGLE_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GOOGLE_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -262,7 +324,7 @@ export async function executeRun(agentName, onProgress) {
         break;
       }
 
-      cs = applyFx(cs, res.stateEffects);
+      cs = applyFx(cs, res.stateEffects, dec.id);
       log.push({
         id: dec.id, quarter: q, tier: dec.tier,
         trigger: dec.trigger, humanDecision: dec.human,

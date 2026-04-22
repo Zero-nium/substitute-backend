@@ -1109,6 +1109,16 @@ export default function App() {
         </div>
       </div>
 
+      {/* ── Disclosure Banner ── */}
+      <div style={{ background: "#fdfaf5", borderBottom: "1px solid var(--ink10)" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "10px 32px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: "#92400e", background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 2, padding: "2px 6px", whiteSpace: "nowrap", marginTop: 1 }}>METHODOLOGY NOTE</span>
+          <p style={{ fontFamily: "var(--body)", fontSize: 11, color: "var(--ink60)", margin: 0, lineHeight: 1.6 }}>
+            Project Substitute is a structured simulation, not a financial model. Quarterly state effects are estimated by a language model within human-authored physical bounds per decision point. The ND/EBITDA covenant ratio is derived from debt and EBITDA components — it is not directly set by the model. Consistency scores reflect qualitative mandate adherence assessment and should be treated as ordinal rankings within the cohort, not absolute measures. The macro environment (GDP, inflation, e-commerce growth, Amazon subscriber counts) uses historical data. Outcomes reflect the interaction of agent strategic logic with model-estimated economic effects in a historically-grounded but simplified environment.
+          </p>
+        </div>
+      </div>
+
       {/* ── Tabs ── */}
       <div style={{ background: "var(--paper)", borderBottom: "1px solid var(--ink10)" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", display: "flex", gap: 0 }}>
