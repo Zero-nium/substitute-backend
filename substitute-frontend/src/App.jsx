@@ -574,7 +574,7 @@ function MethodologyView() {
       sublabel: 'Layer 1 — physical bounds',
       color: '#991b1b',
       bg: '#fef2f2',
-      detail: 'Before any state effect is applied, the Logic Anchor validates and clamps the AI-returned values. This is the key methodological safeguard. debtCovenant is stripped from model output entirely — it is always derived from totalDebt / ebitda. All other fields are clamped to decision-specific physical bounds calibrated to what is plausible for a company of TRU's size at that moment. Global bounds provide a second layer.',
+      detail: 'Before any state effect is applied, the Logic Anchor validates and clamps the AI-returned values. This is the key methodological safeguard. debtCovenant is stripped from model output entirely — it is always derived from totalDebt / ebitda. All other fields are clamped to decision-specific physical bounds calibrated to what is plausible for a company of TRU\'s size at that moment. Global bounds provide a second layer.',
       items: ['debtCovenant: derived only from totalDebt/ebitda — never set by model', 'Per-decision bounds: 17 anchor tables, one per decision point', 'Global bounds: cash 0–3000, ebitda -500–1500, totalDebt 500–7500', 'Values outside bounds are clamped, not rejected', 'Pre-anchor runs (before 22 Apr 2026) excluded from analysis'],
     },
     {
