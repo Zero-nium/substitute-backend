@@ -263,7 +263,7 @@ function blindEnlightenedDelta(runs) {
   // Compare same wallet's blind vs enlightened outcomes.
   const byWallet = {};
   for (const run of runs) {
-    if (!run.wallet_address || run.status !== 'COMPLETE') continue;
+    if (!run.wallet_address || run.status !== 'COMPLETE' || run.notes === 'pre-anchor') continue;
     if (!byWallet[run.wallet_address]) byWallet[run.wallet_address] = { blind: [], enlightened: [] };
     const mode = run.mode || 'blind';
     byWallet[run.wallet_address][mode].push(run);
@@ -307,7 +307,7 @@ function blindEnlightenedDelta(runs) {
 // ── Main analysis function ────────────────────────────────────────────────────
 
 export function computeCohortAnalysis() {
-  const runs = db.prepare(`SELECT * FROM runs WHERE status = 'COMPLETE'`).all();
+  const runs = db.prepare(`SELECT * FROM runs WHERE status = 'COMPLETE' AND (notes IS NULL OR notes != 'pre-anchor') AND (notes IS NULL OR notes != 'pre-anchor')`).all();
 
   if (runs.length === 0) {
     return { runCount: 0, computedAt: new Date().toISOString(), message: 'No completed runs yet.' };
@@ -347,7 +347,7 @@ async function watch() {
 
   while (true) {
     try {
-      const { n } = db.prepare(`SELECT COUNT(*) as n FROM runs WHERE status = 'COMPLETE'`).get();
+      const { n } = db.prepare(`SELECT COUNT(*) as n FROM runs WHERE status = 'COMPLETE' AND (notes IS NULL OR notes != 'pre-anchor') AND (notes IS NULL OR notes != 'pre-anchor')`).get();
       if (n !== lastCount) {
         console.log(`[analyser] ${n} completed runs — recomputing cohort analysis`);
         const findings = computeCohortAnalysis();
