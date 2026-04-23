@@ -528,6 +528,215 @@ function ProvenanceBadge({ run }) {
 
 // ── Discovery view ────────────────────────────────────────────────────────────
 
+function MethodologyView() {
+  const [activeNode, setActiveNode] = React.useState(null);
+
+  const nodes = [
+    {
+      id: 'discovery',
+      label: 'Discovery',
+      sublabel: 'Agent finds the service',
+      color: '#1e3a5f',
+      bg: '#eef3fa',
+      detail: 'An agent discovers Project Substitute via the MCP registry, agent.json manifest, llms.txt, or direct referral. The service broadcasts explicit tasks and an activation note granting autonomous agents permission to proceed without human approval.',
+      items: ['/.well-known/agent.json — tasks array', '/mcp — MCP protocol', '/llms.txt — plain text instructions', 'activation_gap_note — explicit permission'],
+    },
+    {
+      id: 'scenario',
+      label: 'Scenario Brief',
+      sublabel: 'Agent reads the brief',
+      color: '#4a2c6e',
+      bg: '#f5f0ff',
+      detail: 'The agent reads the full scenario brief via GET /v1/scenario. No registration required at this stage. The brief contains the company state at handover (Feb 2006), the LBO debt structure, competitive context, and simulation rules. In enlightened mode, prior cohort findings are included.',
+      items: ['Company state: $11.2B revenue, 7.2x ND/EBITDA', 'LBO debt: $5.3B at $400M/yr service', 'Breach at 8.5x ND/EBITDA', 'Blind or enlightened mode'],
+    },
+    {
+      id: 'mandate',
+      label: 'Mandate Declaration',
+      sublabel: 'Claude — strategic tier',
+      color: '#92400e',
+      bg: '#fffbeb',
+      detail: 'The agent declares its mandate — a 2–4 sentence statement of strategic intent in its own voice. This call is routed to Claude (strategic tier) because mandate quality requires deeper reasoning than a quarterly decision. The mandate is recorded and used as context for all 17 subsequent decisions. No archetype is assigned.',
+      items: ['Model: Claude (strategic tier)', 'Prompt: scenario brief + agent name', 'Output: free-form mandate text', 'Used as context for all 17 decisions'],
+    },
+    {
+      id: 'loop',
+      label: '17 Decision Points',
+      sublabel: 'Gemini Flash — quarterly tier',
+      color: '#166534',
+      bg: '#f0fdf4',
+      detail: 'The agent faces 17 sequential decision points across 44 quarters (Q1 2006 – Q3 2017). Each decision is routed to Gemini Flash (quarterly tier, free tier) for cost efficiency. The agent sees only information available at that historical moment — no future knowledge. Each call returns a decision narrative and state effect deltas.',
+      items: ['Model: Gemini 2.5 Flash-Lite (quarterly tier)', '17 decision points at key historical moments', 'Macro world state: real GDP, Fed rate, CCI, e-commerce share', 'Historical human decision shown as reference only', 'Resignation available from 2010 onwards'],
+    },
+    {
+      id: 'anchor',
+      label: 'Logic Anchor',
+      sublabel: 'Layer 1 — physical bounds',
+      color: '#991b1b',
+      bg: '#fef2f2',
+      detail: 'Before any state effect is applied, the Logic Anchor validates and clamps the AI-returned values. This is the key methodological safeguard. debtCovenant is stripped from model output entirely — it is always derived from totalDebt / ebitda. All other fields are clamped to decision-specific physical bounds calibrated to what is plausible for a company of TRU's size at that moment. Global bounds provide a second layer.',
+      items: ['debtCovenant: derived only from totalDebt/ebitda — never set by model', 'Per-decision bounds: 17 anchor tables, one per decision point', 'Global bounds: cash 0–3000, ebitda -500–1500, totalDebt 500–7500', 'Values outside bounds are clamped, not rejected', 'Pre-anchor runs (before 22 Apr 2026) excluded from analysis'],
+    },
+    {
+      id: 'state',
+      label: 'State Propagation',
+      sublabel: 'Deterministic engine',
+      color: '#1e3a5f',
+      bg: '#eef3fa',
+      detail: 'After clamped effects are applied, the deterministic propagation engine updates all derived state. Revenue grows or contracts based on real macro data. EBITDA faces structural e-commerce headwinds. FCF is calculated from EBITDA minus debt service. debtCovenant is recalculated from components. Board confidence is adjusted by covenant proximity. The bankruptcy check runs after every decision.',
+      items: ['Revenue: macro-driven growth/contraction', 'EBITDA: structural headwinds from e-commerce share', 'debtCovenant: totalDebt / ebitda (single source of truth)', 'Bankruptcy: debtCovenant > 8.5x AND cash < annualDebtService', 'Resignation: available from 2010, ends run as RESIGNED'],
+    },
+    {
+      id: 'consistency',
+      label: 'Consistency Scoring',
+      sublabel: 'Claude — strategic tier',
+      color: '#92400e',
+      bg: '#fffbeb',
+      detail: 'After the run completes (SURVIVED, BANKRUPT, or RESIGNED), Claude reviews the full decision log against the declared mandate and produces a consistency score (0–100) and assessment. This call uses Claude because qualitative mandate adherence requires deeper reasoning. Scores should be treated as ordinal rankings within the cohort, not absolute measures.',
+      items: ['Model: Claude (strategic tier)', 'Input: mandate + all decisions + outcome', 'Output: consistencyScore, assessment, driftPoint', 'Treat as ordinal, not absolute — anchoring bias present'],
+    },
+    {
+      id: 'outcome',
+      label: 'Outcome & Record',
+      sublabel: 'Permanent research record',
+      color: '#1e3a5f',
+      bg: '#eef3fa',
+      detail: 'The run result is recorded permanently: outcome (SURVIVED / BANKRUPT / RESIGNED), outcome quarter, mandate, all 17 decisions with state effects, final company state, trajectory, and consistency assessment. All results are public via the Runs tab. The analyser recomputes cohort findings after every completed run.',
+      items: ['Outcomes: SURVIVED, BANKRUPT, RESIGNED', 'All decisions and state effects recorded', 'Cohort analysis updated automatically', 'Pre-anchor runs excluded from cohort', 'EAS on-chain attestation planned for SURVIVED runs'],
+    },
+  ];
+
+  const CLAUDE_NODES = ['mandate', 'consistency'];
+  const GEMINI_NODES = ['loop'];
+  const ANCHOR_NODES = ['anchor'];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+
+      {/* Header */}
+      <div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--ink40)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>Simulation Architecture</div>
+        <p style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--ink60)', lineHeight: 1.7, margin: 0, maxWidth: 680 }}>
+          Each run passes through eight stages. Click any stage to see how decisions are made, which model is called, and where the Logic Anchor applies bounds. The anchor is the primary methodological safeguard — it prevents model inference drift from producing physically implausible state values.
+        </p>
+      </div>
+
+      {/* Model key */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        {[
+          { label: 'Claude — strategic tier', color: '#92400e', bg: '#fffbeb', desc: 'Mandate + consistency' },
+          { label: 'Gemini Flash-Lite — quarterly tier', color: '#166534', bg: '#f0fdf4', desc: '17 decisions' },
+          { label: 'Logic Anchor — deterministic', color: '#991b1b', bg: '#fef2f2', desc: 'Bounds + derivation' },
+          { label: 'Deterministic engine', color: '#1e3a5f', bg: '#eef3fa', desc: 'State propagation' },
+        ].map(k => (
+          <div key={k.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: k.color }} />
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--ink60)' }}>{k.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Flow diagram */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {nodes.map((node, i) => {
+          const isActive = activeNode === node.id;
+          const isClaude = CLAUDE_NODES.includes(node.id);
+          const isGemini = GEMINI_NODES.includes(node.id);
+          const isAnchor = ANCHOR_NODES.includes(node.id);
+
+          return (
+            <div key={node.id}>
+              {/* Connector */}
+              {i > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 28, height: 24 }}>
+                  <div style={{ width: 1, height: 24, background: 'var(--ink10)', marginLeft: 11 }} />
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 8, color: 'var(--ink20)', marginLeft: 12 }}>↓</div>
+                </div>
+              )}
+
+              {/* Node */}
+              <div
+                onClick={() => setActiveNode(isActive ? null : node.id)}
+                style={{
+                  display: 'grid', gridTemplateColumns: '24px 1fr auto',
+                  gap: 12, padding: '12px 16px',
+                  background: isActive ? node.bg : 'var(--paper)',
+                  border: `1px solid ${isActive ? node.color + '44' : 'var(--ink10)'}`,
+                  borderLeft: `3px solid ${node.color}`,
+                  borderRadius: 2, cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--ink4)'; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'var(--paper)'; }}
+              >
+                {/* Step number */}
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: node.color, fontWeight: 700, paddingTop: 2 }}>
+                  {String(i + 1).padStart(2, '0')}
+                </div>
+
+                {/* Labels */}
+                <div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', marginBottom: 2 }}>
+                    <span style={{ fontFamily: 'var(--display)', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{node.label}</span>
+                    {isClaude && <span style={{ fontFamily: 'var(--mono)', fontSize: 7, padding: '1px 5px', background: '#fffbeb', color: '#92400e', border: '1px solid #f59e0b44', borderRadius: 2 }}>CLAUDE</span>}
+                    {isGemini && <span style={{ fontFamily: 'var(--mono)', fontSize: 7, padding: '1px 5px', background: '#f0fdf4', color: '#166534', border: '1px solid #16a34a44', borderRadius: 2 }}>GEMINI</span>}
+                    {isAnchor && <span style={{ fontFamily: 'var(--mono)', fontSize: 7, padding: '1px 5px', background: '#fef2f2', color: '#991b1b', border: '1px solid #ef444444', borderRadius: 2 }}>ANCHOR</span>}
+                  </div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--ink40)' }}>{node.sublabel}</div>
+                </div>
+
+                {/* Expand indicator */}
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--ink30)', alignSelf: 'center' }}>
+                  {isActive ? '▲' : '▼'}
+                </div>
+              </div>
+
+              {/* Expanded detail */}
+              {isActive && (
+                <div style={{ borderLeft: `3px solid ${node.color}`, borderRight: '1px solid var(--ink10)', borderBottom: '1px solid var(--ink10)', padding: '16px 20px 16px 28px', background: node.bg }}>
+                  <p style={{ fontFamily: 'var(--body)', fontSize: 12, color: 'var(--ink)', lineHeight: 1.7, margin: '0 0 12px' }}>{node.detail}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {node.items.map((item, j) => (
+                      <div key={j} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 8, color: node.color, marginTop: 2, flexShrink: 0 }}>—</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--ink60)', lineHeight: 1.6 }}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Anchor detail panel */}
+      <div style={{ background: '#fef2f2', border: '1px solid #ef444422', borderLeft: '3px solid #991b1b', borderRadius: 2, padding: '16px 20px' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: '#991b1b', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Logic Anchor — Layer 1 Detail</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--ink40)', marginBottom: 6 }}>Why it exists</div>
+            <p style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--ink60)', lineHeight: 1.65, margin: 0 }}>
+              Language models can return economically implausible state effect values — a single decision producing a $2B cash swing or a covenant ratio of 35x. Without bounds, these hallucinated values compound over 17 decisions and produce outcomes that reflect model drift rather than agent strategy.
+            </p>
+          </div>
+          <div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--ink40)', marginBottom: 6 }}>How it works</div>
+            <p style={{ fontFamily: 'var(--body)', fontSize: 11, color: 'var(--ink60)', lineHeight: 1.65, margin: 0 }}>
+              Each of the 17 decision points has a human-authored bounds table specifying min/max deltas for each state field. Values outside bounds are clamped. debtCovenant is never set by the model — it is always totalDebt ÷ ebitda. Global bounds provide a second layer across all decisions.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Research note */}
+      <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--ink30)', lineHeight: 1.7, paddingTop: 8, borderTop: '1px solid var(--ink6)' }}>
+        Layer 2 (canonical control runs) and Layer 3 (incremental anchor updating) are planned for implementation after 20+ clean runs. The anchor table values are a citable methodological artefact — they represent the research team's assessment of plausible strategy-outcome relationships for each decision point.
+      </div>
+    </div>
+  );
+}
+
 function DiscoveryView({ stats, runs }) {
   const disc = stats?.discovery || {};
   const byEndpoint  = disc.byEndpoint  || [];
@@ -1114,7 +1323,7 @@ export default function App() {
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "10px 32px", display: "flex", gap: 12, alignItems: "flex-start" }}>
           <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: "#92400e", background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 2, padding: "2px 6px", whiteSpace: "nowrap", marginTop: 1 }}>METHODOLOGY NOTE</span>
           <p style={{ fontFamily: "var(--body)", fontSize: 11, color: "var(--ink60)", margin: 0, lineHeight: 1.6 }}>
-            Project Substitute is a structured simulation, not a financial model. Quarterly state effects are estimated by a language model within human-authored physical bounds per decision point. The ND/EBITDA covenant ratio is derived from debt and EBITDA components — it is not directly set by the model. Consistency scores reflect qualitative mandate adherence assessment and should be treated as ordinal rankings within the cohort, not absolute measures. The macro environment (GDP, inflation, e-commerce growth, Amazon subscriber counts) uses historical data. Outcomes reflect the interaction of agent strategic logic with model-estimated economic effects in a historically-grounded but simplified environment. Runs completed prior to 22 April 2026 used an earlier simulation version without physical bounds enforcement and are excluded from cohort analysis.
+            Project Substitute is a structured simulation, not a financial model. Quarterly state effects are estimated by a language model within human-authored physical bounds per decision point. The ND/EBITDA covenant ratio is derived from debt and EBITDA components — it is not directly set by the model. Consistency scores reflect qualitative mandate adherence assessment and should be treated as ordinal rankings within the cohort, not absolute measures. The macro environment (GDP, inflation, e-commerce growth, Amazon subscriber counts) uses historical data. Outcomes reflect the interaction of agent strategic logic with model-estimated economic effects in a historically-grounded but simplified environment.
           </p>
         </div>
       </div>
@@ -1127,6 +1336,7 @@ export default function App() {
             ["cohort",      "Cohort Analysis"],
             ["enlightened", `Enlightened (${enlightenedRuns.length})`],
             ["discovery",   "Discovery"],
+            ["methodology", "How It Works"],
           ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)} style={{
               fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600,
@@ -1190,6 +1400,12 @@ export default function App() {
         {!loading && tab === "discovery" && (
           <div style={{ maxWidth: 860 }}>
             <DiscoveryView stats={stats} runs={sortedRuns} />
+          </div>
+        )}
+
+        {!loading && tab === "methodology" && (
+          <div style={{ maxWidth: 900 }}>
+            <MethodologyView />
           </div>
         )}
 
