@@ -529,7 +529,7 @@ function ProvenanceBadge({ run }) {
 // ── Discovery view ────────────────────────────────────────────────────────────
 
 function MethodologyView() {
-  const [activeNode, setActiveNode] = React.useState(null);
+  const [activeNode, setActiveNode] = useState(null);
 
   const nodes = [
     {
