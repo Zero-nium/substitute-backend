@@ -2,13 +2,13 @@
 // Runs alongside api.js as a separate Fly process group.
 // Polls the DB every 10s, claims the next QUEUED run, executes it, repeats.
 
-
+import 'dotenv/config';
 import {
   claimNextRun, updateRunProgress, setMandate,
   completeRun, failRun, expirePending, getRunById,
 } from './db.js';
 import { executeRun } from './simulation.js';
-import { sendCallback } from './callback.js';
+import { sendCallback } from './api.js';
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -23,6 +23,7 @@ async function processNextRun() {
   console.log(`[runner] Starting run ${run.run_id} for agent "${run.agent_name}"`);
 
   try {
+    const scenarioId = run.scenario_id || 'TRU-2006';
     const result = await executeRun(run.agent_name, async (progress) => {
       // Called after each decision — writes live state to DB.
       if (progress.mandate) {
@@ -34,7 +35,7 @@ async function processNextRun() {
         finalState:        progress.finalState        || null,
         trajectory:        progress.trajectory        || null,
       });
-    });
+    }, scenarioId);
 
     const durationMinutes = Math.round((Date.now() - startedAt) / 60000);
 
@@ -71,11 +72,6 @@ async function processNextRun() {
 // ── Main loop ─────────────────────────────────────────────────────────────────
 async function loop() {
   console.log('[runner] Started — polling every', POLL_INTERVAL_MS / 1000, 'seconds');
-
-  // Reset any runs left in RUNNING state from a previous crashed session.
-  const { db } = await import('./db.js');
-  db.prepare(`UPDATE runs SET status='QUEUED', started_at=NULL, current_quarter=NULL, decisions_complete=0 WHERE status='RUNNING'`).run();
-  console.log('[runner] Cleared any stale RUNNING runs');
 
   while (true) {
     try {

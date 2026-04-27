@@ -148,6 +148,8 @@ const touch = db.prepare(`UPDATE runs SET updated_at = datetime('now') WHERE run
 
 // ── Mode column migration (safe — silently ignored if already exists) ──────────
 try { db.exec(`ALTER TABLE runs ADD COLUMN mode TEXT DEFAULT 'blind'`); } catch {}
+try { db.exec(`ALTER TABLE runs ADD COLUMN scenario_id TEXT DEFAULT 'TRU-2006'`); } catch {}
+try { db.exec(`ALTER TABLE runs ADD COLUMN notes TEXT`); } catch {}
 
 // ── cohort_analysis table ─────────────────────────────────────────────────────
 db.exec(`
@@ -163,10 +165,11 @@ export function insertRun(run) {
   db.prepare(`
     INSERT INTO runs (
       run_id, agent_name, agent_version, wallet_address, callback_url,
-      deposit_address, deposit_amount_eth, expires_at, status
+      deposit_address, deposit_amount_eth, expires_at, status, scenario_id, mode
     ) VALUES (
       @run_id, @agent_name, @agent_version, @wallet_address, @callback_url,
-      @deposit_address, @deposit_amount_eth, @expires_at, 'PENDING'
+      @deposit_address, @deposit_amount_eth, @expires_at, 'PENDING',
+      COALESCE(@scenario_id, 'TRU-2006'), COALESCE(@mode, 'blind')
     )
   `).run(run);
 }
