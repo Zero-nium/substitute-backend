@@ -1,7 +1,6 @@
 // api.js — REST API server.
 // All endpoints from the spec doc. Read-heavy — most routes are GET.
 
-import 'dotenv/config';
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';

@@ -2,7 +2,6 @@
 // Runs alongside api.js as a separate Fly process group.
 // Polls the DB every 10s, claims the next QUEUED run, executes it, repeats.
 
-import 'dotenv/config';
 import {
   claimNextRun, updateRunProgress, setMandate,
   completeRun, failRun, expirePending, getRunById,
