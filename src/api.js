@@ -70,24 +70,31 @@ function estimatedWaitMinutes(queuePosition) {
 
 // Shape a run row for public API consumption.
 function shapeRun(run) {
+  let finalState, trajectory, decisions, consistency;
+  try { finalState  = run.final_state  ? JSON.parse(run.final_state)  : null; } catch { finalState  = null; }
+  try { trajectory  = run.trajectory   ? JSON.parse(run.trajectory)   : null; } catch { trajectory  = null; }
+  try { decisions   = run.decisions    ? JSON.parse(run.decisions)    : null; } catch { decisions   = null; }
+  try { consistency = run.consistency  ? JSON.parse(run.consistency)  : null; } catch { consistency = null; }
   return {
-    runId:          run.run_id,
-    agentName:      run.agent_name,
-    agentVersion:   run.agent_version,
-    status:         run.status,
-    completedAt:    run.completed_at,
-    durationMinutes:run.duration_minutes,
-    outcome:        run.outcome,
-    outcomeQuarter: run.outcome_quarter,
-    mandate:        run.mandate,
-    finalState:     run.finalState || null,
-    trajectory:     run.trajectory || null,
-    decisions:      run.decisions  || null,
-    consistency:    run.consistency || null,
+    runId:           run.run_id,
+    agentName:       run.agent_name,
+    agentVersion:    run.agent_version,
+    mode:            run.mode || 'blind',
+    status:          run.status,
+    completedAt:     run.completed_at,
+    durationMinutes: run.duration_minutes,
+    outcome:         run.outcome,
+    outcomeQuarter:  run.outcome_quarter,
+    mandate:         run.mandate,
+    scenarioId:      run.scenario_id || 'TRU-2006',
+    finalState,
+    trajectory,
+    decisions,
+    consistency,
+    consistencyScore: consistency?.consistencyScore ?? null,
     historicalBaseline: {
       revenue: 11540, ebitda: 460, cash: 300,
       debtCovenant: 11.5, ecomRevShare: 5.1,
-      boardConfidence: 28, digitalCapability: 31,
       outcome: 'BANKRUPT', outcomeQuarter: '2017-Q3',
     },
   };
