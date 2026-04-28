@@ -5,13 +5,10 @@
 
 import { db } from './db.js';
 
-// ── Schema extension ──────────────────────────────────────────────────────────
-db.exec(`
-  -- mode column on runs: 'blind' (default) or 'enlightened'
-  ALTER TABLE runs ADD COLUMN mode TEXT DEFAULT 'blind';
-`).catch?.() || (() => {
-  try { db.exec(`ALTER TABLE runs ADD COLUMN mode TEXT DEFAULT 'blind'`); } catch {}
-})();
+// ── Schema migrations (safe — silently ignored if columns already exist) ────
+try { db.exec(`ALTER TABLE runs ADD COLUMN mode TEXT DEFAULT 'blind'`); } catch {}
+try { db.exec(`ALTER TABLE runs ADD COLUMN scenario_id TEXT DEFAULT 'TRU-2006'`); } catch {}
+try { db.exec(`ALTER TABLE runs ADD COLUMN notes TEXT`); } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS cohort_analysis (
