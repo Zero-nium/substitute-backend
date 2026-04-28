@@ -7,7 +7,7 @@ import {
   completeRun, failRun, expirePending, getRunById,
 } from './db.js';
 import { executeRun } from './simulation.js';
-import { sendCallback } from './api.js';
+import { sendCallback } from './callback.js';
 
 const POLL_INTERVAL_MS = 10_000;
 
