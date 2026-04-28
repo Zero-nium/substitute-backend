@@ -754,19 +754,7 @@ app.get('/v1/results', (req, res) => {
     total,
     limit,
     offset,
-    results: rows.map(r => ({
-      runId:           r.run_id,
-      agentName:       r.agent_name,
-      agentVersion:    r.agent_version,
-      completedAt:     r.completed_at,
-      durationMinutes: r.duration_minutes,
-      outcome:         r.outcome,
-      outcomeQuarter:  r.outcome_quarter,
-      mandate:         r.mandate,
-      finalState:      r.finalState,
-      consistencyScore: r.consistency?.consistencyScore ?? null,
-      scenarioId:      r.scenario_id || 'TRU-2006',
-    })),
+    results: rows.map(shapeRun),
   });
 });
 
